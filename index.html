@@ -283,22 +283,27 @@
       <div class="summary" id="summary"></div>
 
       <div class="result-section">
-        <h3 id="numberTitle">1. Kiểm tra số thứ tự các khối sau gộp</h3>
+        <h3 id="structureTitle">1. Kiểm tra cấu trúc SRT sau gộp</h3>
+        <div id="structureResult"></div>
+      </div>
+
+      <div class="result-section">
+        <h3 id="numberTitle">2. Kiểm tra số thứ tự các khối sau gộp</h3>
         <div id="numberResult"></div>
       </div>
 
       <div class="result-section">
-        <h3 id="timeTitle">2. Kiểm tra mốc thời gian (start / end) có xuất hiện trong SRT gốc</h3>
+        <h3 id="timeTitle">3. Kiểm tra mốc thời gian (start / end) có xuất hiện trong SRT gốc</h3>
         <div id="timeResult"></div>
       </div>
 
       <div class="result-section">
-        <h3 id="logicTitle">3. Kiểm tra logic thời gian trong SRT sau gộp</h3>
+        <h3 id="logicTitle">4. Kiểm tra logic thời gian trong SRT sau gộp</h3>
         <div id="logicResult"></div>
       </div>
 
       <div class="result-section">
-        <h3>4. Chi tiết từng khối sau gộp</h3>
+        <h3>5. Chi tiết từng khối sau gộp</h3>
         <div class="card" style="overflow-x:auto; padding:0;">
           <table>
             <thead>
@@ -324,52 +329,93 @@
 
   <script>
     // ========== PARSER ==========
+    // Trả về { blocks, structureIssues }
+    // structureIssues: các dòng không hợp lệ về cấu trúc
     function parseSRT(raw) {
       const blocks = [];
-      if (!raw || !raw.trim()) return blocks;
+      const structureIssues = [];
+      if (!raw || !raw.trim()) return { blocks, structureIssues };
 
-      // Normalize line endings and split
+      // Normalize line endings and split (giữ số dòng gốc để báo cáo)
       const lines = raw.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
       let i = 0;
 
       while (i < lines.length) {
-        // Skip empty lines
+        // Bỏ qua dòng trống
         while (i < lines.length && lines[i].trim() === '') i++;
         if (i >= lines.length) break;
 
-        // Number
+        const lineNum = i + 1; // 1-based
         const numStr = lines[i].trim();
         const num = parseInt(numStr, 10);
-        if (isNaN(num)) {
+
+        // Kỳ vọng là số thứ tự khối
+        if (isNaN(num) || String(num) !== numStr) {
+          // Đây là dòng chữ/text không hợp lệ (không phải số khối)
+          structureIssues.push({
+            line: lineNum,
+            content: numStr.length > 80 ? numStr.substring(0, 80) + '…' : numStr,
+            reason: 'Dòng này không phải số thứ tự khối (xuất hiện khi đang chờ khối mới)'
+          });
           i++;
           continue;
         }
         i++;
 
-        // Time line
-        if (i >= lines.length) break;
+        // Kỳ vọng dòng thời gian
+        if (i >= lines.length) {
+          structureIssues.push({
+            line: lineNum,
+            content: numStr,
+            reason: 'Có số thứ tự nhưng thiếu dòng thời gian phía sau'
+          });
+          break;
+        }
+
         const timeLine = lines[i].trim();
         const timeMatch = timeLine.match(/(\d{1,2}:\d{2}:\d{2}[,.]\d{3})\s*-->\s*(\d{1,2}:\d{2}:\d{2}[,.]\d{3})/);
         if (!timeMatch) {
+          structureIssues.push({
+            line: i + 1,
+            content: timeLine.length > 80 ? timeLine.substring(0, 80) + '…' : timeLine,
+            reason: `Sau số ${num} không phải dòng thời gian hợp lệ`
+          });
           i++;
           continue;
         }
-        // Normalize comma
+
         const start = timeMatch[1].replace('.', ',');
         const end = timeMatch[2].replace('.', ',');
         i++;
 
-        // Text (can be multi-line until blank)
+        // Lấy nội dung text (có thể nhiều dòng cho đến khi gặp dòng trống)
         const textLines = [];
+        const textStartLine = i + 1;
         while (i < lines.length && lines[i].trim() !== '') {
           textLines.push(lines[i].trim());
           i++;
         }
-        const text = textLines.join(' ');
 
+        if (textLines.length === 0) {
+          structureIssues.push({
+            line: textStartLine,
+            content: `(sau thời gian ${start} --> ${end})`,
+            reason: `Khối ${num} không có nội dung text`
+          });
+        } else if (textLines.length > 1) {
+          // Báo nếu có nhiều hơn 1 dòng text trong 1 khối
+          structureIssues.push({
+            line: textStartLine,
+            content: textLines[0].substring(0, 50) + (textLines[0].length > 50 ? '…' : ''),
+            reason: `Khối ${num} có ${textLines.length} dòng text (thông thường chỉ nên 1 dòng)`
+          });
+        }
+
+        const text = textLines.join(' ');
         blocks.push({ num, start, end, text });
       }
-      return blocks;
+
+      return { blocks, structureIssues };
     }
 
     // ========== TIME HELPERS ==========
@@ -399,8 +445,8 @@
     function updateCounts() {
       const orig = parseSRT(document.getElementById('originalSrt').value);
       const merged = parseSRT(document.getElementById('mergedSrt').value);
-      document.getElementById('origCount').textContent = orig.length + ' khối';
-      document.getElementById('mergedCount').textContent = merged.length + ' khối';
+      document.getElementById('origCount').textContent = orig.blocks.length + ' khối';
+      document.getElementById('mergedCount').textContent = merged.blocks.length + ' khối';
     }
 
     document.getElementById('originalSrt').addEventListener('input', updateCounts);
@@ -411,14 +457,19 @@
       const origRaw = document.getElementById('originalSrt').value;
       const mergedRaw = document.getElementById('mergedSrt').value;
 
-      const origBlocks = parseSRT(origRaw);
-      const mergedBlocks = parseSRT(mergedRaw);
+      const origParsed = parseSRT(origRaw);
+      const mergedParsed = parseSRT(mergedRaw);
+
+      const origBlocks = origParsed.blocks;
+      const mergedBlocks = mergedParsed.blocks;
+      // Chỉ quan tâm lỗi cấu trúc của SRT sau khi gộp
+      const structureIssues = mergedParsed.structureIssues;
 
       if (origBlocks.length === 0) {
         alert('Vui lòng dán SRT gốc!');
         return;
       }
-      if (mergedBlocks.length === 0) {
+      if (mergedBlocks.length === 0 && structureIssues.length === 0) {
         alert('Vui lòng dán SRT sau khi gộp!');
         return;
       }
@@ -541,6 +592,10 @@
           <div class="label">Khối sau gộp</div>
         </div>
         <div class="stat">
+          <div class="num" style="color:${structureIssues.length ? 'var(--danger)' : 'var(--success)'}">${structureIssues.length}</div>
+          <div class="label">Lỗi cấu trúc</div>
+        </div>
+        <div class="stat">
           <div class="num" style="color:${numberIssues.length ? 'var(--danger)' : 'var(--success)'}">${numberIssues.length}</div>
           <div class="label">Lỗi số thứ tự</div>
         </div>
@@ -554,40 +609,53 @@
         </div>
       `;
 
-      // Number result
+      // 1. Structure result
+      const structureTitle = document.getElementById('structureTitle');
+      const structureResult = document.getElementById('structureResult');
+      if (structureIssues.length === 0) {
+        structureTitle.innerHTML = '1. Kiểm tra cấu trúc SRT sau gộp <span class="status-ok">✓ Hợp lệ</span>';
+        structureResult.innerHTML = `<div class="ok-box">Cấu trúc đúng: mỗi khối = số thứ tự → dòng thời gian → 1 dòng nội dung. Không có dòng text thừa.</div>`;
+      } else {
+        structureTitle.innerHTML = `1. Kiểm tra cấu trúc SRT sau gộp <span class="status-err">✗ Có ${structureIssues.length} lỗi</span>`;
+        structureResult.innerHTML = `<ul class="issue-list">${structureIssues.map(iss => 
+          `<li><strong>Dòng ${iss.line}:</strong> ${escapeHtml(iss.content)}<br><span style="color:var(--muted);font-size:0.85em">${iss.reason}</span></li>`
+        ).join('')}</ul>`;
+      }
+
+      // 2. Number result
       const numTitle = document.getElementById('numberTitle');
       const numResult = document.getElementById('numberResult');
       if (numberIssues.length === 0) {
-        numTitle.innerHTML = '1. Kiểm tra số thứ tự các khối sau gộp <span class="status-ok">✓ Đúng</span>';
+        numTitle.innerHTML = '2. Kiểm tra số thứ tự các khối sau gộp <span class="status-ok">✓ Đúng</span>';
         numResult.innerHTML = `<div class="ok-box">Tất cả số thứ tự liên tục từ 1 → ${mergedBlocks.length}, không trùng, không nhảy lùi, không bỏ sót.</div>`;
       } else {
-        numTitle.innerHTML = `1. Kiểm tra số thứ tự các khối sau gộp <span class="status-err">✗ Có ${numberIssues.length} lỗi</span>`;
+        numTitle.innerHTML = `2. Kiểm tra số thứ tự các khối sau gộp <span class="status-err">✗ Có ${numberIssues.length} lỗi</span>`;
         numResult.innerHTML = `<ul class="issue-list">${numberIssues.map(iss => `<li>${iss}</li>`).join('')}</ul>`;
       }
 
-      // Time appearance result
+      // 3. Time appearance result
       const timeTitle = document.getElementById('timeTitle');
       const timeResult = document.getElementById('timeResult');
       if (timeIssues.length === 0) {
-        timeTitle.innerHTML = '2. Kiểm tra mốc thời gian (start / end) có xuất hiện trong SRT gốc <span class="status-ok">✓ Tất cả đều có</span>';
+        timeTitle.innerHTML = '3. Kiểm tra mốc thời gian (start / end) có xuất hiện trong SRT gốc <span class="status-ok">✓ Tất cả đều có</span>';
         timeResult.innerHTML = `<div class="ok-box">Mọi thời gian bắt đầu và kết thúc của các khối sau gộp đều xuất hiện ít nhất một lần trong SRT gốc.</div>`;
       } else {
-        timeTitle.innerHTML = `2. Kiểm tra mốc thời gian (start / end) có xuất hiện trong SRT gốc <span class="status-err">✗ Có ${timeIssues.length} lỗi</span>`;
+        timeTitle.innerHTML = `3. Kiểm tra mốc thời gian (start / end) có xuất hiện trong SRT gốc <span class="status-err">✗ Có ${timeIssues.length} lỗi</span>`;
         timeResult.innerHTML = `<ul class="issue-list">${timeIssues.map(iss => `<li>${iss}</li>`).join('')}</ul>`;
       }
 
-      // Logic time result
+      // 4. Logic time result
       const logicTitle = document.getElementById('logicTitle');
       const logicResult = document.getElementById('logicResult');
       if (logicIssues.length === 0) {
-        logicTitle.innerHTML = '3. Kiểm tra logic thời gian trong SRT sau gộp <span class="status-ok">✓ Không có lỗi</span>';
+        logicTitle.innerHTML = '4. Kiểm tra logic thời gian trong SRT sau gộp <span class="status-ok">✓ Không có lỗi</span>';
         logicResult.innerHTML = `<div class="ok-box">Không có khối nào bị start ≥ end, cũng không có thời gian bắt đầu/kết thúc của khối sau sớm hơn khối trước.</div>`;
       } else {
-        logicTitle.innerHTML = `3. Kiểm tra logic thời gian trong SRT sau gộp <span class="status-err">✗ Có ${logicIssues.length} lỗi</span>`;
+        logicTitle.innerHTML = `4. Kiểm tra logic thời gian trong SRT sau gộp <span class="status-err">✗ Có ${logicIssues.length} lỗi</span>`;
         logicResult.innerHTML = `<ul class="issue-list">${logicIssues.map(iss => `<li>${iss}</li>`).join('')}</ul>`;
       }
 
-      // Detail table
+      // 5. Detail table
       const tbody = document.getElementById('detailTable');
       tbody.innerHTML = detailRows.map(r => `
         <tr>
