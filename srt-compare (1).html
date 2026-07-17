@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>So sánh SRT trước & sau khi gộp</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --card: #1a2332;
+      --border: #2d3a4f;
+      --text: #e7ecf3;
+      --muted: #8b9cb3;
+      --accent: #3b82f6;
+      --accent-hover: #2563eb;
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --code-bg: #0d1117;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      min-height: 100vh;
+      padding: 24px;
+    }
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    header {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+    header h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      background: linear-gradient(135deg, #60a5fa, #a78bfa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    header p {
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+    @media (max-width: 900px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+    }
+    .card h2 {
+      font-size: 1.1rem;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .card h2 .badge {
+      font-size: 0.75rem;
+      background: var(--border);
+      color: var(--muted);
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-weight: 500;
+    }
+    textarea {
+      width: 100%;
+      height: 320px;
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+      font-size: 12.5px;
+      line-height: 1.45;
+      padding: 12px;
+      resize: vertical;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    textarea:focus {
+      border-color: var(--accent);
+    }
+    .actions {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      margin-bottom: 28px;
+      flex-wrap: wrap;
+    }
+    button {
+      font-family: inherit;
+      font-size: 0.95rem;
+      font-weight: 600;
+      padding: 12px 28px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.15s;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: white;
+    }
+    .btn-primary:hover {
+      background: var(--accent-hover);
+      transform: translateY(-1px);
+    }
+    .btn-secondary {
+      background: var(--border);
+      color: var(--text);
+    }
+    .btn-secondary:hover {
+      background: #3d4f6a;
+    }
+    #results {
+      display: none;
+    }
+    #results.show {
+      display: block;
+    }
+    .result-section {
+      margin-bottom: 24px;
+    }
+    .result-section h3 {
+      font-size: 1.15rem;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .status-ok {
+      color: var(--success);
+    }
+    .status-err {
+      color: var(--danger);
+    }
+    .status-warn {
+      color: var(--warning);
+    }
+    .issue-list {
+      list-style: none;
+    }
+    .issue-list li {
+      background: rgba(239, 68, 68, 0.08);
+      border-left: 3px solid var(--danger);
+      padding: 10px 14px;
+      margin-bottom: 8px;
+      border-radius: 0 6px 6px 0;
+      font-size: 0.9rem;
+    }
+    .ok-box {
+      background: rgba(34, 197, 94, 0.08);
+      border-left: 3px solid var(--success);
+      padding: 14px 16px;
+      border-radius: 0 8px 8px 0;
+      color: var(--success);
+      font-weight: 500;
+    }
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 14px;
+      margin-bottom: 28px;
+    }
+    .stat {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      text-align: center;
+    }
+    .stat .num {
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: var(--accent);
+    }
+    .stat .label {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+    th, td {
+      padding: 10px 12px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    th {
+      background: rgba(59, 130, 246, 0.1);
+      color: var(--muted);
+      font-weight: 600;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    tr:hover td {
+      background: rgba(255,255,255,0.02);
+    }
+    .time-ok { color: var(--success); }
+    .time-bad { color: var(--danger); font-weight: 600; }
+    .badge-ok, .badge-bad {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .badge-ok {
+      background: rgba(34, 197, 94, 0.15);
+      color: var(--success);
+    }
+    .badge-bad {
+      background: rgba(239, 68, 68, 0.15);
+      color: var(--danger);
+    }
+    .hint {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: 8px;
+    }
+    footer {
+      text-align: center;
+      margin-top: 40px;
+      color: var(--muted);
+      font-size: 0.8rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>So sánh SRT trước & sau khi gộp</h1>
+      <p>Kiểm tra số thứ tự khối + kiểm tra mốc thời gian của khối gộp có xuất hiện trong SRT gốc hay không</p>
+    </header>
+
+    <div class="grid">
+      <div class="card">
+        <h2>SRT gốc <span class="badge" id="origCount">0 khối</span></h2>
+        <textarea id="originalSrt" placeholder="Dán toàn bộ nội dung file SRT gốc vào đây..."></textarea>
+        <p class="hint">Mỗi khối: số thứ tự → dòng thời gian → nội dung</p>
+      </div>
+      <div class="card">
+        <h2>SRT sau khi gộp <span class="badge" id="mergedCount">0 khối</span></h2>
+        <textarea id="mergedSrt" placeholder="Dán toàn bộ nội dung file SRT sau khi gộp vào đây..."></textarea>
+        <p class="hint">Kiểm tra số thứ tự liên tục + thời gian start/end có trong gốc</p>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn-primary" onclick="analyze()">
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+        Phân tích so sánh
+      </button>
+      <button class="btn-secondary" onclick="clearAll()">
+        Xóa hết
+      </button>
+    </div>
+
+    <div id="results">
+      <div class="summary" id="summary"></div>
+
+      <div class="result-section">
+        <h3 id="numberTitle">1. Kiểm tra số thứ tự các khối sau gộp</h3>
+        <div id="numberResult"></div>
+      </div>
+
+      <div class="result-section">
+        <h3 id="timeTitle">2. Kiểm tra mốc thời gian (start / end) có xuất hiện trong SRT gốc</h3>
+        <div id="timeResult"></div>
+      </div>
+
+      <div class="result-section">
+        <h3 id="logicTitle">3. Kiểm tra logic thời gian trong SRT sau gộp</h3>
+        <div id="logicResult"></div>
+      </div>
+
+      <div class="result-section">
+        <h3>4. Chi tiết từng khối sau gộp</h3>
+        <div class="card" style="overflow-x:auto; padding:0;">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Thời gian</th>
+                <th>Thời lượng cảnh</th>
+                <th>Start trong gốc?</th>
+                <th>End trong gốc?</th>
+                <th>Nội dung (rút gọn)</th>
+              </tr>
+            </thead>
+            <tbody id="detailTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <footer>
+      Công cụ kiểm tra SRT gộp · Chỉ chạy local trên trình duyệt của bạn · Không gửi dữ liệu đi đâu
+    </footer>
+  </div>
+
+  <script>
+    // ========== PARSER ==========
+    function parseSRT(raw) {
+      const blocks = [];
+      if (!raw || !raw.trim()) return blocks;
+
+      // Normalize line endings and split
+      const lines = raw.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+      let i = 0;
+
+      while (i < lines.length) {
+        // Skip empty lines
+        while (i < lines.length && lines[i].trim() === '') i++;
+        if (i >= lines.length) break;
+
+        // Number
+        const numStr = lines[i].trim();
+        const num = parseInt(numStr, 10);
+        if (isNaN(num)) {
+          i++;
+          continue;
+        }
+        i++;
+
+        // Time line
+        if (i >= lines.length) break;
+        const timeLine = lines[i].trim();
+        const timeMatch = timeLine.match(/(\d{1,2}:\d{2}:\d{2}[,.]\d{3})\s*-->\s*(\d{1,2}:\d{2}:\d{2}[,.]\d{3})/);
+        if (!timeMatch) {
+          i++;
+          continue;
+        }
+        // Normalize comma
+        const start = timeMatch[1].replace('.', ',');
+        const end = timeMatch[2].replace('.', ',');
+        i++;
+
+        // Text (can be multi-line until blank)
+        const textLines = [];
+        while (i < lines.length && lines[i].trim() !== '') {
+          textLines.push(lines[i].trim());
+          i++;
+        }
+        const text = textLines.join(' ');
+
+        blocks.push({ num, start, end, text });
+      }
+      return blocks;
+    }
+
+    // ========== TIME HELPERS ==========
+    function timeToMs(t) {
+      if (!t) return 0;
+      const normalized = t.replace('.', ',');
+      const [hms, msPart] = normalized.split(',');
+      const parts = hms.split(':').map(Number);
+      const h = parts[0] || 0;
+      const m = parts[1] || 0;
+      const s = parts[2] || 0;
+      const ms = parseInt(msPart || '0', 10);
+      return ((h * 3600 + m * 60 + s) * 1000) + ms;
+    }
+
+    function msToTime(ms) {
+      if (ms < 0) return 'LỖI';
+      const totalSec = Math.floor(ms / 1000);
+      const milli = ms % 1000;
+      const h = Math.floor(totalSec / 3600);
+      const m = Math.floor((totalSec % 3600) / 60);
+      const s = totalSec % 60;
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')},${String(milli).padStart(3, '0')}`;
+    }
+
+    // ========== UPDATE COUNTS ==========
+    function updateCounts() {
+      const orig = parseSRT(document.getElementById('originalSrt').value);
+      const merged = parseSRT(document.getElementById('mergedSrt').value);
+      document.getElementById('origCount').textContent = orig.length + ' khối';
+      document.getElementById('mergedCount').textContent = merged.length + ' khối';
+    }
+
+    document.getElementById('originalSrt').addEventListener('input', updateCounts);
+    document.getElementById('mergedSrt').addEventListener('input', updateCounts);
+
+    // ========== ANALYZE ==========
+    function analyze() {
+      const origRaw = document.getElementById('originalSrt').value;
+      const mergedRaw = document.getElementById('mergedSrt').value;
+
+      const origBlocks = parseSRT(origRaw);
+      const mergedBlocks = parseSRT(mergedRaw);
+
+      if (origBlocks.length === 0) {
+        alert('Vui lòng dán SRT gốc!');
+        return;
+      }
+      if (mergedBlocks.length === 0) {
+        alert('Vui lòng dán SRT sau khi gộp!');
+        return;
+      }
+
+      // Collect all unique times from original
+      const origTimes = new Set();
+      origBlocks.forEach(b => {
+        origTimes.add(b.start);
+        origTimes.add(b.end);
+      });
+
+      // ===== 1. NUMBER SEQUENCE CHECK =====
+      const numberIssues = [];
+      const seenNums = new Set();
+      let expected = 1;
+
+      for (let i = 0; i < mergedBlocks.length; i++) {
+        const b = mergedBlocks[i];
+        const n = b.num;
+
+        if (seenNums.has(n)) {
+          numberIssues.push(`Trùng số thứ tự <strong>${n}</strong> (xuất hiện lần nữa ở vị trí khối thứ ${i + 1})`);
+        }
+        seenNums.add(n);
+
+        if (n !== expected) {
+          if (n < expected) {
+            numberIssues.push(`Nhảy lùi: sau số <strong>${expected - 1}</strong> lại xuất hiện <strong>${n}</strong> (khối thứ ${i + 1})`);
+          } else {
+            numberIssues.push(`Nhảy có khoảng trống: từ <strong>${expected - 1}</strong> nhảy lên <strong>${n}</strong> (bỏ qua ${expected} → ${n - 1})`);
+          }
+        }
+        expected = n + 1;
+      }
+
+      if (mergedBlocks.length > 0 && mergedBlocks[0].num !== 1) {
+        numberIssues.unshift(`Không bắt đầu từ 1 (bắt đầu từ <strong>${mergedBlocks[0].num}</strong>)`);
+      }
+
+      // ===== 2. TIME APPEARANCE CHECK =====
+      const timeIssues = [];
+
+      // ===== 3. LOGIC TIME CHECK (internal + sequential) =====
+      const logicIssues = [];
+
+      // ===== DETAIL ROWS + DURATION =====
+      const detailRows = [];
+
+      for (let i = 0; i < mergedBlocks.length; i++) {
+        const b = mergedBlocks[i];
+        const startMs = timeToMs(b.start);
+        const endMs = timeToMs(b.end);
+
+        // --- Appearance in original ---
+        const startOk = origTimes.has(b.start);
+        const endOk = origTimes.has(b.end);
+
+        if (!startOk) {
+          timeIssues.push(`Khối <strong>${b.num}</strong>: thời gian bắt đầu <code>${b.start}</code> <span style="color:#ef4444">không xuất hiện</span> ở bất kỳ đâu trong SRT gốc`);
+        }
+        if (!endOk) {
+          timeIssues.push(`Khối <strong>${b.num}</strong>: thời gian kết thúc <code>${b.end}</code> <span style="color:#ef4444">không xuất hiện</span> ở bất kỳ đâu trong SRT gốc`);
+        }
+
+        // --- Internal validity: start >= end ---
+        if (startMs >= endMs) {
+          logicIssues.push(`Khối <strong>${b.num}</strong>: thời gian bắt đầu <strong>≥</strong> thời gian kết thúc (<code>${b.start}</code> ≥ <code>${b.end}</code>)`);
+        }
+
+        // --- Sequential: later block earlier than previous ---
+        if (i > 0) {
+          const prev = mergedBlocks[i - 1];
+          const prevStartMs = timeToMs(prev.start);
+          const prevEndMs = timeToMs(prev.end);
+
+          if (startMs < prevStartMs) {
+            logicIssues.push(`Khối <strong>${b.num}</strong>: thời gian bắt đầu (<code>${b.start}</code>) sớm hơn khối trước (<code>${prev.start}</code>)`);
+          }
+          if (endMs < prevEndMs) {
+            logicIssues.push(`Khối <strong>${b.num}</strong>: thời gian kết thúc (<code>${b.end}</code>) sớm hơn khối trước (<code>${prev.end}</code>)`);
+          }
+        }
+
+        // --- Calculate "Thời lượng cảnh" ---
+        let durationMs;
+        if (i === mergedBlocks.length - 1) {
+          // Khối cuối: end - start của chính nó
+          durationMs = endMs - startMs;
+        } else {
+          // Khối đầu + khối giữa: start của khối sau - (0 nếu là khối 1, còn lại là start hiện tại)
+          const nextStartMs = timeToMs(mergedBlocks[i + 1].start);
+          const baseMs = (i === 0) ? 0 : startMs;
+          durationMs = nextStartMs - baseMs;
+        }
+
+        const shortText = b.text.length > 60 ? b.text.substring(0, 60) + '…' : b.text;
+        detailRows.push({
+          num: b.num,
+          time: `${b.start} → ${b.end}`,
+          duration: msToTime(durationMs),
+          durationMs,
+          startOk,
+          endOk,
+          text: shortText
+        });
+      }
+
+      // ===== RENDER =====
+      const resultsEl = document.getElementById('results');
+      resultsEl.classList.add('show');
+
+      // Summary
+      document.getElementById('summary').innerHTML = `
+        <div class="stat">
+          <div class="num">${origBlocks.length}</div>
+          <div class="label">Khối SRT gốc</div>
+        </div>
+        <div class="stat">
+          <div class="num">${mergedBlocks.length}</div>
+          <div class="label">Khối sau gộp</div>
+        </div>
+        <div class="stat">
+          <div class="num" style="color:${numberIssues.length ? 'var(--danger)' : 'var(--success)'}">${numberIssues.length}</div>
+          <div class="label">Lỗi số thứ tự</div>
+        </div>
+        <div class="stat">
+          <div class="num" style="color:${timeIssues.length ? 'var(--danger)' : 'var(--success)'}">${timeIssues.length}</div>
+          <div class="label">Lỗi mốc thời gian</div>
+        </div>
+        <div class="stat">
+          <div class="num" style="color:${logicIssues.length ? 'var(--danger)' : 'var(--success)'}">${logicIssues.length}</div>
+          <div class="label">Lỗi logic thời gian</div>
+        </div>
+      `;
+
+      // Number result
+      const numTitle = document.getElementById('numberTitle');
+      const numResult = document.getElementById('numberResult');
+      if (numberIssues.length === 0) {
+        numTitle.innerHTML = '1. Kiểm tra số thứ tự các khối sau gộp <span class="status-ok">✓ Đúng</span>';
+        numResult.innerHTML = `<div class="ok-box">Tất cả số thứ tự liên tục từ 1 → ${mergedBlocks.length}, không trùng, không nhảy lùi, không bỏ sót.</div>`;
+      } else {
+        numTitle.innerHTML = `1. Kiểm tra số thứ tự các khối sau gộp <span class="status-err">✗ Có ${numberIssues.length} lỗi</span>`;
+        numResult.innerHTML = `<ul class="issue-list">${numberIssues.map(iss => `<li>${iss}</li>`).join('')}</ul>`;
+      }
+
+      // Time appearance result
+      const timeTitle = document.getElementById('timeTitle');
+      const timeResult = document.getElementById('timeResult');
+      if (timeIssues.length === 0) {
+        timeTitle.innerHTML = '2. Kiểm tra mốc thời gian (start / end) có xuất hiện trong SRT gốc <span class="status-ok">✓ Tất cả đều có</span>';
+        timeResult.innerHTML = `<div class="ok-box">Mọi thời gian bắt đầu và kết thúc của các khối sau gộp đều xuất hiện ít nhất một lần trong SRT gốc.</div>`;
+      } else {
+        timeTitle.innerHTML = `2. Kiểm tra mốc thời gian (start / end) có xuất hiện trong SRT gốc <span class="status-err">✗ Có ${timeIssues.length} lỗi</span>`;
+        timeResult.innerHTML = `<ul class="issue-list">${timeIssues.map(iss => `<li>${iss}</li>`).join('')}</ul>`;
+      }
+
+      // Logic time result
+      const logicTitle = document.getElementById('logicTitle');
+      const logicResult = document.getElementById('logicResult');
+      if (logicIssues.length === 0) {
+        logicTitle.innerHTML = '3. Kiểm tra logic thời gian trong SRT sau gộp <span class="status-ok">✓ Không có lỗi</span>';
+        logicResult.innerHTML = `<div class="ok-box">Không có khối nào bị start ≥ end, cũng không có thời gian bắt đầu/kết thúc của khối sau sớm hơn khối trước.</div>`;
+      } else {
+        logicTitle.innerHTML = `3. Kiểm tra logic thời gian trong SRT sau gộp <span class="status-err">✗ Có ${logicIssues.length} lỗi</span>`;
+        logicResult.innerHTML = `<ul class="issue-list">${logicIssues.map(iss => `<li>${iss}</li>`).join('')}</ul>`;
+      }
+
+      // Detail table
+      const tbody = document.getElementById('detailTable');
+      tbody.innerHTML = detailRows.map(r => `
+        <tr>
+          <td><strong>${r.num}</strong></td>
+          <td style="font-family:monospace; font-size:0.8rem;">${r.time}</td>
+          <td style="font-family:monospace; font-size:0.8rem; ${r.durationMs < 0 ? 'color:var(--danger);font-weight:600' : ''}">${r.duration}</td>
+          <td>${r.startOk ? '<span class="badge-ok">Có</span>' : '<span class="badge-bad">Không</span>'}</td>
+          <td>${r.endOk ? '<span class="badge-ok">Có</span>' : '<span class="badge-bad">Không</span>'}</td>
+          <td style="color:var(--muted); max-width:320px;">${escapeHtml(r.text)}</td>
+        </tr>
+      `).join('');
+
+      // Scroll to results
+      resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function escapeHtml(str) {
+      return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function clearAll() {
+      document.getElementById('originalSrt').value = '';
+      document.getElementById('mergedSrt').value = '';
+      document.getElementById('results').classList.remove('show');
+      updateCounts();
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      updateCounts();
+    });
+  </script>
+</body>
+</html>
