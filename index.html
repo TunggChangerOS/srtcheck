@@ -750,10 +750,11 @@
       updateCounts();
     }
 
-    // ========== SEARCH FUNCTION (multi highlight + next) ==========
-    let currentSearchTerm = '';
-    let currentMatchIndex = 0;
-    let currentMatches = [];
+    // ========== SEARCH FUNCTION (multi highlight + next) - independent per side ==========
+    const searchState = {
+      'originalContent': { term: '', index: 0, matches: [] },
+      'mergedContent': { term: '', index: 0, matches: [] }
+    };
 
     function performSearch(contentId, searchInputId) {
       const contentDiv = document.getElementById(contentId);
@@ -766,34 +767,36 @@
       const rawText = contentDiv.innerText || '';
       if (!rawText) return;
 
-      // Nếu là từ khóa mới → reset highlight và tìm lại
-      if (searchTerm !== currentSearchTerm) {
-        currentSearchTerm = searchTerm;
-        currentMatchIndex = 0;
+      const state = searchState[contentId];
 
-        // Clear previous highlights
+      // Nếu là từ khóa mới trên bên này → reset highlight và tìm lại
+      if (searchTerm !== state.term) {
+        state.term = searchTerm;
+        state.index = 0;
+
+        // Clear previous highlights on this side only
         contentDiv.innerHTML = escapeHtmlForDiv(rawText);
 
         // Highlight all
         const regex = new RegExp(escapeRegExp(searchTerm), 'gi');
         contentDiv.innerHTML = contentDiv.innerHTML.replace(regex, match => `<mark data-match="true">${match}</mark>`);
 
-        // Collect all marks
-        currentMatches = Array.from(contentDiv.querySelectorAll('mark[data-match]'));
+        // Collect all marks for this side
+        state.matches = Array.from(contentDiv.querySelectorAll('mark[data-match]'));
       }
 
-      // Cycle to next match
-      if (currentMatches.length > 0) {
-        currentMatchIndex = (currentMatchIndex + 1) % currentMatches.length;
-        const targetMark = currentMatches[currentMatchIndex];
+      // Cycle to next match on this side
+      if (state.matches.length > 0) {
+        state.index = (state.index + 1) % state.matches.length;
+        const targetMark = state.matches[state.index];
         targetMark.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
-        // Highlight all in normal yellow, current one in stronger color
-        currentMatches.forEach(m => {
+        // Highlight all in normal yellow, current one in stronger color (this side only)
+        state.matches.forEach(m => {
           m.style.background = '#facc15';
           m.style.boxShadow = 'none';
         });
-        targetMark.style.background = '#f59e0b';  // darker orange-yellow for current
+        targetMark.style.background = '#f59e0b';
         targetMark.style.boxShadow = '0 0 0 2px #b45309';
       }
     }
@@ -801,9 +804,13 @@
     function clearSearch(contentId, searchInputId) {
       const contentDiv = document.getElementById(contentId);
       document.getElementById(searchInputId).value = '';
-      currentSearchTerm = '';
-      currentMatchIndex = 0;
-      currentMatches = [];
+
+      const state = searchState[contentId];
+      if (state) {
+        state.term = '';
+        state.index = 0;
+        state.matches = [];
+      }
 
       // Restore plain text (remove all inline styles too)
       const plainText = contentDiv.innerText || '';
