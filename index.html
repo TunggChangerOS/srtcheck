@@ -70,6 +70,25 @@
       align-items: center;
       gap: 8px;
     }
+    .search-container {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px;
+      align-items: center;
+    }
+    .search-input {
+      flex: 1;
+      padding: 8px 12px;
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-family: inherit;
+    }
+    .search-btn {
+      padding: 8px 16px;
+      font-size: 0.85rem;
+    }
     .card h2 .badge {
       font-size: 0.75rem;
       background: var(--border);
@@ -95,6 +114,33 @@
     }
     textarea:focus {
       border-color: var(--accent);
+    }
+    .srt-content {
+      width: 100%;
+      max-height: 420px;
+      min-height: 320px;
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+      font-size: 12.5px;
+      line-height: 1.45;
+      padding: 12px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .srt-content:focus {
+      border-color: var(--accent);
+    }
+    mark {
+      background: #facc15;
+      color: #1f2937;
+      padding: 2px 1px;
+      border-radius: 2px;
     }
     .actions {
       display: flex;
@@ -259,13 +305,23 @@
     <div class="grid">
       <div class="card">
         <h2>SRT gốc <span class="badge" id="origCount">0 khối</span></h2>
-        <textarea id="originalSrt" placeholder="Dán toàn bộ nội dung file SRT gốc vào đây..."></textarea>
-        <p class="hint">Mỗi khối: số thứ tự → dòng thời gian → nội dung</p>
+        <div class="search-container">
+          <input type="text" id="searchOrig" class="search-input" placeholder="Tìm trong SRT gốc...">
+          <button class="btn-secondary search-btn" onclick="performSearch('originalContent', 'searchOrig')">Tìm</button>
+          <button class="btn-secondary search-btn" onclick="clearSearch('originalContent', 'searchOrig')">Xóa</button>
+        </div>
+        <div id="originalContent" class="srt-content" contenteditable="true" spellcheck="false" placeholder="Dán toàn bộ nội dung file SRT gốc vào đây..."></div>
+        <p class="hint">Mỗi khối: số thứ tự → dòng thời gian → nội dung (có thể paste trực tiếp)</p>
       </div>
       <div class="card">
         <h2>SRT sau khi gộp <span class="badge" id="mergedCount">0 khối</span></h2>
-        <textarea id="mergedSrt" placeholder="Dán toàn bộ nội dung file SRT sau khi gộp vào đây..."></textarea>
-        <p class="hint">Kiểm tra số thứ tự liên tục + thời gian start/end có trong gốc</p>
+        <div class="search-container">
+          <input type="text" id="searchMerged" class="search-input" placeholder="Tìm trong SRT sau gộp...">
+          <button class="btn-secondary search-btn" onclick="performSearch('mergedContent', 'searchMerged')">Tìm</button>
+          <button class="btn-secondary search-btn" onclick="clearSearch('mergedContent', 'searchMerged')">Xóa</button>
+        </div>
+        <div id="mergedContent" class="srt-content" contenteditable="true" spellcheck="false" placeholder="Dán toàn bộ nội dung file SRT sau khi gộp vào đây..."></div>
+        <p class="hint">Kiểm tra số thứ tự liên tục + thời gian start/end có trong gốc (có thể paste trực tiếp)</p>
       </div>
     </div>
 
@@ -322,9 +378,6 @@
       </div>
     </div>
 
-    <footer>
-      Công cụ kiểm tra SRT gộp · Chỉ chạy local trên trình duyệt của bạn · Không gửi dữ liệu đi đâu
-    </footer>
   </div>
 
   <script>
@@ -388,11 +441,16 @@
         const end = timeMatch[2].replace('.', ',');
         i++;
 
-        // Lấy nội dung text (có thể nhiều dòng cho đến khi gặp dòng trống)
+        // Lấy nội dung text (dừng khi gặp dòng trống HOẶC khi gặp dòng chỉ toàn số = số khối tiếp theo)
         const textLines = [];
         const textStartLine = i + 1;
         while (i < lines.length && lines[i].trim() !== '') {
-          textLines.push(lines[i].trim());
+          const candidate = lines[i].trim();
+          // Nếu dòng này trông giống số thứ tự khối mới → dừng lại để vòng ngoài xử lý
+          if (/^\d+$/.test(candidate)) {
+            break;
+          }
+          textLines.push(candidate);
           i++;
         }
 
@@ -443,19 +501,24 @@
 
     // ========== UPDATE COUNTS ==========
     function updateCounts() {
-      const orig = parseSRT(document.getElementById('originalSrt').value);
-      const merged = parseSRT(document.getElementById('mergedSrt').value);
+      const origText = document.getElementById('originalContent').innerText || '';
+      const mergedText = document.getElementById('mergedContent').innerText || '';
+      const orig = parseSRT(origText);
+      const merged = parseSRT(mergedText);
       document.getElementById('origCount').textContent = orig.blocks.length + ' khối';
       document.getElementById('mergedCount').textContent = merged.blocks.length + ' khối';
     }
 
-    document.getElementById('originalSrt').addEventListener('input', updateCounts);
-    document.getElementById('mergedSrt').addEventListener('input', updateCounts);
+    // Input listener for live count update
+    const origContent = document.getElementById('originalContent');
+    const mergedContent = document.getElementById('mergedContent');
+    if (origContent) origContent.addEventListener('input', updateCounts);
+    if (mergedContent) mergedContent.addEventListener('input', updateCounts);
 
     // ========== ANALYZE ==========
     function analyze() {
-      const origRaw = document.getElementById('originalSrt').value;
-      const mergedRaw = document.getElementById('mergedSrt').value;
+      const origRaw = document.getElementById('originalContent').innerText || '';
+      const mergedRaw = document.getElementById('mergedContent').innerText || '';
 
       const origParsed = parseSRT(origRaw);
       const mergedParsed = parseSRT(mergedRaw);
@@ -499,7 +562,7 @@
           if (n < expected) {
             numberIssues.push(`Nhảy lùi: sau số <strong>${expected - 1}</strong> lại xuất hiện <strong>${n}</strong> (khối thứ ${i + 1})`);
           } else {
-            numberIssues.push(`Nhảy có khoảng trống: từ <strong>${expected - 1}</strong> nhảy lên <strong>${n}</strong> (bỏ qua ${expected} → ${n - 1})`);
+            numberIssues.push(`Nhảy có khoảng trống: từ <strong>${expected - 1}</strong> nhảy lên <strong>${n}</strong> (thiếu số ${expected}${n - expected > 1 ? ' → ' + (n - 1) : ''})`);
           }
         }
         expected = n + 1;
@@ -681,14 +744,107 @@
     }
 
     function clearAll() {
-      document.getElementById('originalSrt').value = '';
-      document.getElementById('mergedSrt').value = '';
+      document.getElementById('originalContent').innerHTML = '';
+      document.getElementById('mergedContent').innerHTML = '';
       document.getElementById('results').classList.remove('show');
       updateCounts();
     }
 
+    // ========== SEARCH FUNCTION (multi highlight + next) ==========
+    let currentSearchTerm = '';
+    let currentMatchIndex = 0;
+    let currentMatches = [];
+
+    function performSearch(contentId, searchInputId) {
+      const contentDiv = document.getElementById(contentId);
+      const searchTerm = document.getElementById(searchInputId).value.trim();
+
+      if (!searchTerm) {
+        alert('Vui lòng nhập từ khóa để tìm!');
+        return;
+      }
+
+      const rawText = contentDiv.innerText || '';
+      if (!rawText) return;
+
+      // Nếu là từ khóa mới → reset highlight và tìm lại
+      if (searchTerm !== currentSearchTerm) {
+        currentSearchTerm = searchTerm;
+        currentMatchIndex = 0;
+
+        // Clear previous highlights
+        contentDiv.innerHTML = escapeHtmlForDiv(rawText);
+
+        // Highlight all
+        const regex = new RegExp(escapeRegExp(searchTerm), 'gi');
+        contentDiv.innerHTML = contentDiv.innerHTML.replace(regex, match => `<mark data-match="true">${match}</mark>`);
+
+        // Collect all marks
+        currentMatches = Array.from(contentDiv.querySelectorAll('mark[data-match]'));
+      }
+
+      // Cycle to next match
+      if (currentMatches.length > 0) {
+        currentMatchIndex = (currentMatchIndex + 1) % currentMatches.length;
+        const targetMark = currentMatches[currentMatchIndex];
+        targetMark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+        // Temporary highlight current one stronger
+        currentMatches.forEach(m => m.style.background = '#facc15');
+        targetMark.style.background = '#eab308';
+      }
+
+      const count = currentMatches.length;
+      if (count === 0) {
+        alert(`Không tìm thấy "${searchTerm}"`);
+      } else {
+        alert(`Tìm thấy ${count} lần "${searchTerm}" - Đang ở kết quả ${currentMatchIndex + 1}/${count} (ấn Tìm tiếp để nhảy tiếp)`);
+      }
+    }
+
+    function clearSearch(contentId, searchInputId) {
+      const contentDiv = document.getElementById(contentId);
+      document.getElementById(searchInputId).value = '';
+      currentSearchTerm = '';
+      currentMatchIndex = 0;
+      currentMatches = [];
+
+      // Restore plain text
+      const plainText = contentDiv.innerText || '';
+      contentDiv.innerHTML = escapeHtmlForDiv(plainText);
+      contentDiv.focus();
+    }
+
+    function escapeHtmlForDiv(str) {
+      return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/\n/g, '<br>');
+    }
+
+    function escapeRegExp(string) {
+      return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
     window.addEventListener('DOMContentLoaded', () => {
       updateCounts();
+
+      // Enter key support for search
+      const searchOrigInput = document.getElementById('searchOrig');
+      const searchMergedInput = document.getElementById('searchMerged');
+
+      if (searchOrigInput) {
+        searchOrigInput.addEventListener('keypress', (e) => {
+          if (e.key === 'Enter') performSearch('originalContent', 'searchOrig');
+        });
+      }
+      if (searchMergedInput) {
+        searchMergedInput.addEventListener('keypress', (e) => {
+          if (e.key === 'Enter') performSearch('mergedContent', 'searchMerged');
+        });
+      }
     });
   </script>
 </body>
