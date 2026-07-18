@@ -117,8 +117,7 @@
     }
     .srt-content {
       width: 100%;
-      max-height: 420px;
-      min-height: 320px;
+      height: 420px;
       background: var(--code-bg);
       border: 1px solid var(--border);
       border-radius: 8px;
@@ -132,6 +131,7 @@
       word-break: break-all;
       outline: none;
       transition: border-color 0.15s;
+      box-sizing: border-box;
     }
     .srt-content:focus {
       border-color: var(--accent);
@@ -760,7 +760,6 @@
       const searchTerm = document.getElementById(searchInputId).value.trim();
 
       if (!searchTerm) {
-        alert('Vui lòng nhập từ khóa để tìm!');
         return;
       }
 
@@ -789,16 +788,13 @@
         const targetMark = currentMatches[currentMatchIndex];
         targetMark.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
-        // Temporary highlight current one stronger
-        currentMatches.forEach(m => m.style.background = '#facc15');
-        targetMark.style.background = '#eab308';
-      }
-
-      const count = currentMatches.length;
-      if (count === 0) {
-        alert(`Không tìm thấy "${searchTerm}"`);
-      } else {
-        alert(`Tìm thấy ${count} lần "${searchTerm}" - Đang ở kết quả ${currentMatchIndex + 1}/${count} (ấn Tìm tiếp để nhảy tiếp)`);
+        // Highlight all in normal yellow, current one in stronger color
+        currentMatches.forEach(m => {
+          m.style.background = '#facc15';
+          m.style.boxShadow = 'none';
+        });
+        targetMark.style.background = '#f59e0b';  // darker orange-yellow for current
+        targetMark.style.boxShadow = '0 0 0 2px #b45309';
       }
     }
 
@@ -809,7 +805,7 @@
       currentMatchIndex = 0;
       currentMatches = [];
 
-      // Restore plain text
+      // Restore plain text (remove all inline styles too)
       const plainText = contentDiv.innerText || '';
       contentDiv.innerHTML = escapeHtmlForDiv(plainText);
       contentDiv.focus();
