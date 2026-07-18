@@ -499,7 +499,7 @@
       return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')},${String(milli).padStart(3, '0')}`;
     }
 
-    // ========== UPDATE COUNTS ==========
+    // ========== UPDATE COUNTS (debounced to avoid lag on paste) ==========
     function updateCounts() {
       const origText = document.getElementById('originalContent').innerText || '';
       const mergedText = document.getElementById('mergedContent').innerText || '';
@@ -509,11 +509,22 @@
       document.getElementById('mergedCount').textContent = merged.blocks.length + ' khối';
     }
 
-    // Input listener for live count update
+    // Simple debounce helper
+    function debounce(fn, delay = 400) {
+      let timeout;
+      return function (...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => fn.apply(this, args), delay);
+      };
+    }
+
+    const debouncedUpdateCounts = debounce(updateCounts, 400);
+
+    // Input listener for live count update (debounced)
     const origContent = document.getElementById('originalContent');
     const mergedContent = document.getElementById('mergedContent');
-    if (origContent) origContent.addEventListener('input', updateCounts);
-    if (mergedContent) mergedContent.addEventListener('input', updateCounts);
+    if (origContent) origContent.addEventListener('input', debouncedUpdateCounts);
+    if (mergedContent) mergedContent.addEventListener('input', debouncedUpdateCounts);
 
     // ========== ANALYZE ==========
     function analyze() {
