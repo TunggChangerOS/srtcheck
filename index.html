@@ -359,7 +359,12 @@
       </div>
 
       <div class="result-section">
-        <h3>5. Chi tiết từng khối sau gộp</h3>
+        <h3 id="completeTitle">5. Kiểm tra độ đầy đủ (thời gian kết thúc khối cuối)</h3>
+        <div id="completeResult"></div>
+      </div>
+
+      <div class="result-section">
+        <h3>6. Chi tiết từng khối sau gộp</h3>
         <div class="card" style="overflow-x:auto; padding:0;">
           <table>
             <thead>
@@ -651,6 +656,38 @@
         });
       }
 
+      // ===== 5. COMPLETENESS CHECK (last end time) =====
+      let completeStatus = 'unknown';
+      let completeMessage = '';
+      let completeDetail = '';
+
+      if (origBlocks.length > 0 && mergedBlocks.length > 0) {
+        const origLastEnd = origBlocks[origBlocks.length - 1].end;
+        const mergedLastEnd = mergedBlocks[mergedBlocks.length - 1].end;
+        const origLastMs = timeToMs(origLastEnd);
+        const mergedLastMs = timeToMs(mergedLastEnd);
+
+        if (mergedLastMs === origLastMs) {
+          completeStatus = 'ok';
+          completeMessage = 'Đã đủ';
+          completeDetail = `Thời gian kết thúc khối cuối của SRT sau gộp (<code>${mergedLastEnd}</code>) <strong>bằng</strong> thời gian kết thúc khối cuối của SRT gốc (<code>${origLastEnd}</code>).`;
+        } else if (mergedLastMs < origLastMs) {
+          completeStatus = 'missing';
+          completeMessage = 'Thiếu';
+          const diffMs = origLastMs - mergedLastMs;
+          completeDetail = `Thời gian kết thúc khối cuối của SRT sau gộp (<code>${mergedLastEnd}</code>) <strong>nhỏ hơn</strong> SRT gốc (<code>${origLastEnd}</code>) → <span style="color:var(--danger)">thiếu ${msToTime(diffMs)}</span>.`;
+        } else {
+          completeStatus = 'excess';
+          completeMessage = 'Thừa';
+          const diffMs = mergedLastMs - origLastMs;
+          completeDetail = `Thời gian kết thúc khối cuối của SRT sau gộp (<code>${mergedLastEnd}</code>) <strong>lớn hơn</strong> SRT gốc (<code>${origLastEnd}</code>) → <span style="color:var(--warning)">thừa ${msToTime(diffMs)}</span>.`;
+        }
+      } else {
+        completeStatus = 'unknown';
+        completeMessage = 'Không đủ dữ liệu';
+        completeDetail = 'Không thể so sánh vì thiếu khối ở một trong hai SRT.';
+      }
+
       // ===== RENDER =====
       const resultsEl = document.getElementById('results');
       resultsEl.classList.add('show');
@@ -680,6 +717,10 @@
         <div class="stat">
           <div class="num" style="color:${logicIssues.length ? 'var(--danger)' : 'var(--success)'}">${logicIssues.length}</div>
           <div class="label">Lỗi logic thời gian</div>
+        </div>
+        <div class="stat">
+          <div class="num" style="color:${completeStatus === 'ok' ? 'var(--success)' : (completeStatus === 'missing' ? 'var(--danger)' : 'var(--warning)')}">${completeMessage}</div>
+          <div class="label">Độ đầy đủ (khối cuối)</div>
         </div>
       `;
 
@@ -729,7 +770,24 @@
         logicResult.innerHTML = `<ul class="issue-list">${logicIssues.map(iss => `<li>${iss}</li>`).join('')}</ul>`;
       }
 
-      // 5. Detail table
+      // 5. Completeness result
+      const completeTitle = document.getElementById('completeTitle');
+      const completeResult = document.getElementById('completeResult');
+      if (completeStatus === 'ok') {
+        completeTitle.innerHTML = '5. Kiểm tra độ đầy đủ (thời gian kết thúc khối cuối) <span class="status-ok">✓ Đã đủ</span>';
+        completeResult.innerHTML = `<div class="ok-box">${completeDetail}</div>`;
+      } else if (completeStatus === 'missing') {
+        completeTitle.innerHTML = '5. Kiểm tra độ đầy đủ (thời gian kết thúc khối cuối) <span class="status-err">✗ Thiếu</span>';
+        completeResult.innerHTML = `<div style="border-left:3px solid var(--danger); padding:12px 14px; background:rgba(239,68,68,0.08); border-radius:0 6px 6px 0;">${completeDetail}</div>`;
+      } else if (completeStatus === 'excess') {
+        completeTitle.innerHTML = '5. Kiểm tra độ đầy đủ (thời gian kết thúc khối cuối) <span class="status-warn">⚠ Thừa</span>';
+        completeResult.innerHTML = `<div style="border-left:3px solid var(--warning); padding:12px 14px; background:rgba(245,158,11,0.08); border-radius:0 6px 6px 0;">${completeDetail}</div>`;
+      } else {
+        completeTitle.innerHTML = '5. Kiểm tra độ đầy đủ (thời gian kết thúc khối cuối) <span class="status-warn">?</span>';
+        completeResult.innerHTML = `<div>${completeDetail}</div>`;
+      }
+
+      // 6. Detail table
       const tbody = document.getElementById('detailTable');
       tbody.innerHTML = detailRows.map(r => `
         <tr>
